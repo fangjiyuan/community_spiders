@@ -15,6 +15,7 @@ class XiaoquItem(scrapy.Item):
     district = scrapy.Field()  # 区
     name = scrapy.Field()  # 小区名
     url = scrapy.Field()  # 小区链接
+    adcode = scrapy.Field() #小区编码
     detail_address = scrapy.Field()  # 所属详细地址
     coord = scrapy.Field()  # 经纬度
     traffic = scrapy.Field()  # 附近交通
