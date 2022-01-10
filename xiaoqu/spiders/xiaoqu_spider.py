@@ -25,12 +25,20 @@ class XiaoquSpiderSpider(scrapy.Spider):
             start_url = start_urls + '/community/'
             response = requests.get(start_url)
             doc = pq(response.text)
-
-            lis = doc('.list li .text h2 a')
-            li_doc = pq(lis).items()
-            for li in li_doc:
-                url = li('a').attr('href')
-                yield Request(url=url, headers=headers, callback=self.parse)
+            page_lis = re.findall(r'/(\w+)',doc('.pageCounts').text())
+            page_lis = int(page_lis[0])
+            for i in range(1,page_lis):
+                if i > 1:
+                    start_url2 = start_url+'p'+str(i) + '/'
+                else:
+                    start_url2 = start_url
+                response = requests.get(start_url2)
+                doc = pq(response.text)
+                lis = doc('.list li .text h2 a')
+                li_doc = pq(lis).items()
+                for li in li_doc:
+                    url = li('a').attr('href')
+                    yield Request(url=url, headers=headers, callback=self.parse)
 
     def parse(self, response):
         doc = pq(response.text)
@@ -39,14 +47,22 @@ class XiaoquSpiderSpider(scrapy.Spider):
         url = doc('.pos > a:nth-child(4)').attr('href')  # 小区链接
         item['url'] = url  # 小区链接
 
-        name = doc('.t p').text()  # 小区名
+        name = doc('.top .t p').text()  # 小区名
         item['name'] = name  # 小区名
 
         # 根据网页获得小区模糊地址，再通过百度地图API获取经纬度
         addres = doc('.text_nr.bug2').text()  # 小区地址
-        citys = doc('.pos > a:nth-child(2)').text()
-        city = ''.join(re.findall('(\w+)小区', citys)) + '市'
-        districts = doc('span.font_col_o > a').text()  # 所属区
+        if len(addres)==0:
+            addres = doc('.adr').attr('title')
+            city = doc('.inner-postion box .a').text() #+ '市'
+            print(city)
+            #city = ''.join(re.findall('(\w+)市', addres)) + '市'
+            addres = ''.join(re.findall('市(\w+)', addres))
+            districts= doc('.adr >a').text()
+        else:
+            citys = doc('.pos > a:nth-child(2)').text()
+            city = ''.join(re.findall('(\w+)小区', citys)) + '市'
+            districts = doc('span.font_col_o > a').text()  # 所属区
         address = city + districts + addres + name  # 所属详细地址
         # 将地址传入api获取省市区
         location = self.location(address)
@@ -58,6 +74,8 @@ class XiaoquSpiderSpider(scrapy.Spider):
         item['city'] = city
         district = location['district']  # 区
         item['district'] = district
+        adcode =  location['adcode'] 
+        item['adcode'] = adcode
         item['detail_address'] = province + city + district + addres + name  # 详细地址
 
         id = ''.join(re.findall('\d+', url))
@@ -68,7 +86,7 @@ class XiaoquSpiderSpider(scrapy.Spider):
         item['traffic'] = traffic.replace('m', 'm,')  # 交通
 
         prices = doc('div.price > span.dj').text()  # 参考价格
-        if prices == '暂无数据':
+        if prices == '暂无数据' or len(prices)==0 :
             price = None
             item['price'] = price
         else:
@@ -78,7 +96,7 @@ class XiaoquSpiderSpider(scrapy.Spider):
         item['property_type'] = doc('ul > li:nth-child(1) > span.text_nr').text()  # 物业类型
 
         property_fees = doc('ul > li:nth-child(2) > span.text_nr').text()  # 物业费
-        if property_fees == '暂无数据':
+        if property_fees == '暂无数据' or len(property_fees)==0 or property_fees =='价格待定':
             property_fee = None
             item['property_fee'] = property_fee
         else:
@@ -86,7 +104,7 @@ class XiaoquSpiderSpider(scrapy.Spider):
             item['property_fee'] = property_fee
 
         areas = doc('ul > li:nth-child(3) > span.text_nr').text()  # 总建面积
-        if areas == '暂无数据':
+        if areas == '暂无数据' or len(property_fees)==0:
             area = None
             item['area'] = area
         else:
@@ -94,7 +112,7 @@ class XiaoquSpiderSpider(scrapy.Spider):
             item['area'] = area
 
         house_counts = doc('ul > li:nth-child(4) > span.text_nr').text()  # 总户数
-        if house_counts == '暂无数据' or house_counts == '':
+        if house_counts == '暂无数据' or len(house_counts)==0 or house_counts == '' :
             house_count = None
             item['house_count'] = house_count
         else:
@@ -112,7 +130,7 @@ class XiaoquSpiderSpider(scrapy.Spider):
         item['parking_count'] = doc('ul > li:nth-child(6) > span.text_nr').text()  # 停车位
 
         plot_ratios = doc('ul > li:nth-child(7) > span.text_nr').text()  # 容积率
-        if plot_ratios == '暂无数据' or plot_ratios == '':
+        if plot_ratios == '暂无数据' or plot_ratios == ''  or len(plot_ratios)==0:
             plot_ratio = None
             item['plot_ratio'] = plot_ratio
         else:
@@ -120,7 +138,7 @@ class XiaoquSpiderSpider(scrapy.Spider):
             item['plot_ratio'] = plot_ratio
 
         greening_rates = doc('ul > li:nth-child(8) > span.text_nr').text()  # 绿化率
-        if greening_rates == '暂无数据':
+        if greening_rates == '暂无数据' or len(greening_rates)==0:
             greening_rate = None
             item['greening_rate'] = greening_rate
         else:
@@ -139,7 +157,7 @@ class XiaoquSpiderSpider(scrapy.Spider):
 
     # 调用经高德地图API，获取经纬度与详细地址
     def location(self, detail_address):
-        url = "https://restapi.amap.com/v3/geocode/geo?address=" + detail_address + "&key=你的key"
+        url = "https://restapi.amap.com/v3/geocode/geo?address=" + detail_address + "&key=d89d964da70dc6769d257c929f82e4c0"
         response = requests.get(url).json()
         geocodes = response['geocodes']
         for geocode in geocodes:
@@ -147,5 +165,6 @@ class XiaoquSpiderSpider(scrapy.Spider):
             province = geocode['province']
             city = geocode['city']
             district = geocode['district']
-            local = {'coord': coord, 'province': province, 'city': city, 'district': district}
+            adcode = geocode['adcode']
+            local = {'coord': coord, 'province': province, 'city': city, 'district': district,'adcode': adcode}
             return local
