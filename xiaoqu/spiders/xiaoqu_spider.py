@@ -18,11 +18,11 @@ class XiaoquSpiderSpider(scrapy.Spider):
     for url in urls:
         if url in url_delete:
             urls.remove(url)
-
+    urls = ['http://dz.loupan.com','http://lc.loupan.com','http://binzhou.loupan.com','http://heze.loupan.com','http://jn.loupan.com','http://qd.loupan.com','http://wf.loupan.com','http://zb.loupan.com','http://yt.loupan.com','http://weihai.loupan.com','http://linyi.loupan.com','http://rz.loupan.com','http://jining.loupan.com','http://taian.loupan.com','http://dy.loupan.com','http://zaozhuang.loupan.com']
     def start_requests(self):
         headers = self.settings.get('headers')
         for start_urls in self.urls:
-            start_url = start_urls + '/community/'
+            start_url = start_urls + '/community/' 
             response = requests.get(start_url)
             doc = pq(response.text)
             page_lis = re.findall(r'/(\w+)',doc('.pageCounts').text())
