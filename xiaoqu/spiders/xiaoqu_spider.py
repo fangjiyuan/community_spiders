@@ -78,7 +78,7 @@ class XiaoquSpiderSpider(scrapy.Spider):
         item['adcode'] = adcode
         item['detail_address'] = province + city + district + addres + name  # 详细地址
 
-        id = ''.join(re.findall('\d+', url))
+        id = ''.join(re.findall('\d+', str(url)))
         around_url = 'http://sz.loupan.com/community/around/' + id + '.html'  # 周边信息网址
         response = requests.get(around_url)
         around_doc = pq(response.text)
